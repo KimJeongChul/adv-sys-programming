@@ -1,9 +1,12 @@
+/* 컴퓨터공학부 20103318 김정출*/
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/time.h>
+#define BUFFSIZE 128
 
-int readaline_and_out(FILE *fin, FILE *fout);
+int
+readaline_and_out(FILE *fin, FILE *fout);
 
 int
 main(int argc, char *argv[])
@@ -14,7 +17,7 @@ main(int argc, char *argv[])
     struct timeval before, after;
     int duration;
     int ret = 1;
-
+    
     if (argc != 4) {
         fprintf(stderr, "usage: %s file1 file2 fout\n", argv[0]);
         goto leave0;
@@ -31,6 +34,10 @@ main(int argc, char *argv[])
         perror(argv[3]);
         goto leave2;
     }
+    
+    setvbuf(file1,NULL,_IOFBF,BUFFSIZE);
+    setvbuf(file2,NULL,_IOFBF,BUFFSIZE);
+    setvbuf(fout,NULL,_IOFBF,BUFFSIZE);
     
     gettimeofday(&before, NULL);
     do {
@@ -61,16 +68,17 @@ leave2:
 leave1:
     fclose(file1);
 leave0:
-    return ret; 
+    return ret;
 }
 
 /* Read a line from fin and write it to fout */
 /* return 1 if fin meets end of file */
 int
 readaline_and_out(FILE *fin, FILE *fout)
-{    
+{
     int ch, count = 0;
-
+    char str[1024], *p_str;
+    p_str = str;
     do {
         if ((ch = fgetc(fin)) == EOF) {
             if (!count)
@@ -80,9 +88,24 @@ readaline_and_out(FILE *fin, FILE *fout)
                 break;
             }
         }
-        fputc(ch, fout);
+        *p_str++ = ch;
         count++;
     } while (ch != 0x0a);
+    /* reverse string */
+    *p_str = 0;
+    char *start = str;
+    char *end = start + strlen(str) - 1; // CR + LF
+    char tmp;
+    while(end > start)
+    {
+        /* swap */
+        tmp = *start;
+        *start = *end;
+        *end = tmp;
+        /* move */
+        ++start;
+        --end;
+    }
+    fputs(str,fout);
     return 0;
 }
-
