@@ -1,111 +1,134 @@
-/* 컴퓨터공학부 20103318 김정출*/
-#include <stdio.h>
-#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#define BUFFSIZE 128
 
-int
-readaline_and_out(FILE *fin, FILE *fout);
+char
+*strrev(char *str);
 
 int
 main(int argc, char *argv[])
 {
-    FILE *file1, *file2, *fout;
-    int eof1 = 0, eof2 = 0;
-    long line1 = 0, line2 = 0, lineout = 0;
-    struct timeval before, after;
-    int duration;
-    int ret = 1;
-    
-    if (argc != 4) {
-        fprintf(stderr, "usage: %s file1 file2 fout\n", argv[0]);
-        goto leave0;
-    }
-    if ((file1 = fopen(argv[1], "rt")) == NULL) {
-        perror(argv[1]);
-        goto leave0;
-    }
-    if ((file2 = fopen(argv[2], "rt")) == NULL) {
-        perror(argv[2]);
-        goto leave1;
-    }
-    if ((fout = fopen(argv[3], "wt")) == NULL) {
-        perror(argv[3]);
-        goto leave2;
-    }
-    
-    setvbuf(file1,NULL,_IOFBF,BUFFSIZE);
-    setvbuf(file2,NULL,_IOFBF,BUFFSIZE);
-    setvbuf(fout,NULL,_IOFBF,BUFFSIZE);
-    
-    gettimeofday(&before, NULL);
-    do {
-        if (!eof1) {
-            if (!readaline_and_out(file1, fout)) {
-                line1++; lineout++;
-            } else
-                eof1 = 1;
+        int file1, file2;
+        FILE *fout;
+        long line1 = 0, line2 = 0, lineout = 0;
+        struct timeval before, after;
+        struct stat file1_stat, file2_stat;
+        char *file1_buf = 0, *file2_buf = 0;
+        char *file1_token, *file2_token, *file1_ptr, *file2_ptr;
+        char *file1_str, *file2_str;
+        int duration;
+        int ret = 1;
+
+        if (argc != 4) {
+                fprintf(stderr, "usage: %s file1 file2 fout\n", argv[0]);
+                goto leave0;
         }
-        if (!eof2) {
-            if (!readaline_and_out(file2, fout)) {
-                line2++; lineout++;
-            } else
-                eof2 = 1;
+        // file open
+        if((file1 = open(argv[1], O_RDONLY)) < 0) {
+                perror(argv[1]);
+                goto leave0;
         }
-    } while (!eof1 || !eof2);
-    gettimeofday(&after, NULL);
-    
-    duration = (after.tv_sec - before.tv_sec) * 1000000 + (after.tv_usec - before.tv_usec);
-    printf("Processing time = %d.%06d sec\n", duration / 1000000, duration % 1000000);
-    printf("File1 = %ld, File2= %ld, Total = %ld Lines\n", line1, line2, lineout);
-    ret = 0;
-    
+
+        if((file2 = open(argv[2], O_RDONLY)) < 0) {
+                perror(argv[2]);
+                goto leave1;
+        }
+
+        if((fout = fopen(argv[3], "wt")) == NULL) {
+                perror(argv[3]);
+                goto leave2;
+        }
+
+        // fstat
+        if(fstat(file1, &file1_stat) < 0 ) {
+                fprintf(stderr, "Error : read file system information\n");
+                goto leave3;
+        }
+
+        if(fstat(file2, &file2_stat) < 0 ) {
+                fprintf(stderr, "Error : read file system information\n");
+                goto leave3;
+        }
+
+        // buffer
+        if((file1_buf = (char *) malloc(file1_stat.st_size)) == NULL) {
+                fprintf(stderr, "Error : allocate file1 buffer\n");
+                goto leave3;
+        }
+
+        if((file2_buf = (char *) malloc(file2_stat.st_size)) == NULL) {
+                fprintf(stderr, "Error : allocate file2 buffer\n");
+                goto leave4;
+        }
+
+        // read
+        if(read(file1, file1_buf, malloc_usable_size(file1_buf)) < 1) {
+                fprintf(stderr, "Error : read file 1\n");
+                goto leave5;
+        }
+
+        if(read(file2, file2_buf, malloc_usable_size(file2_buf)) < 1) {
+                fprintf(stderr, "Error : read file 1\n");
+                goto leave3;
+        }
+
+        gettimeofday(&before, NULL);
+
+        // write
+        for(file1_str = file1_buf, file2_str = file2_buf; ; file1_str = NULL, file2_str = NULL) {
+                file1_token = strtok_r(file1_str, "\n", &file1_ptr);
+                file2_token = strtok_r(file2_str, "\n", &file2_ptr);
+
+                if(file1_token != NULL) {
+                        fprintf(fout,"%s\n",strrev(file1_token));
+                        ++line1;
+                }
+
+                if(file2_token != NULL) {
+                        fprintf(fout,"%s\n", strrev(file2_token));
+                        ++line2;
+                }
+
+                if(file1_token == NULL && file2_token == NULL)
+                        break;
+        }
+
+        gettimeofday(&after, NULL);
+        lineout = line1 + line2;
+        duration = (after.tv_sec - before.tv_sec) * 1000000 + (after.tv_usec - before.tv_usec);
+        printf("Processing time = %d.%06d sec\n", duration / 1000000, duration % 1000000);
+        printf("File1 = %ld, File2= %ld, Total = %ld Lines\n", line1, line2, lineout);
+        ret = 0;
+
+leave5:
+        free(file1_buf);
+leave4:
+        free(file2_buf);
 leave3:
-    fclose(fout);
+        fclose(fout);
 leave2:
-    fclose(file2);
+        close(file2);
 leave1:
-    fclose(file1);
+        close(file1);
 leave0:
-    return ret;
+        return ret;
 }
 
-/* Read a line from fin and write it to fout */
-/* return 1 if fin meets end of file */
-int
-readaline_and_out(FILE *fin, FILE *fout)
+char
+*strrev(char *str)
 {
-    int ch, count = 0;
-    char str[1024], *p_str;
-    p_str = str;
-    do {
-        if ((ch = fgetc(fin)) == EOF) {
-            if (!count)
-                return 1;
-            else {
-                fputc(0x0a, fout);
-                break;
-            }
+        char tmp;
+        char *start = str;
+        char *end = str + strlen(str) - 1;
+        while(start < end) {
+                tmp = *start;
+                *start = *end;
+                *end = tmp;
+                ++start;
+                --end;
         }
-        *p_str++ = ch;
-        count++;
-    } while (ch != 0x0a);
-    /* reverse string */
-    *p_str = 0;
-    char *start = str;
-    char *end = start + strlen(str) - 1; // CR + LF
-    char tmp;
-    while(end > start)
-    {
-        /* swap */
-        tmp = *start;
-        *start = *end;
-        *end = tmp;
-        /* move */
-        ++start;
-        --end;
-    }
-    fputs(str,fout);
-    return 0;
+        return str;
 }
