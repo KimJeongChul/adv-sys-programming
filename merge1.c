@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/time.h>
-
+#define BUFSIZE 128
 int readaline_and_out(FILE *fin, FILE *fout);
 
 int
@@ -13,8 +13,8 @@ main(int argc, char *argv[])
     long line1 = 0, line2 = 0, lineout = 0;
     struct timeval before, after;
     int duration;
-    int ret = 1;
-
+    int ret = 1; 
+    //char buffer[BUFSIZE];
     if (argc != 4) {
         fprintf(stderr, "usage: %s file1 file2 fout\n", argv[0]);
         goto leave0;
@@ -31,7 +31,9 @@ main(int argc, char *argv[])
         perror(argv[3]);
         goto leave2;
     }
-    
+    setvbuf(file1,NULL,_IOFBF,BUFSIZE);
+    setvbuf(file2,NULL,_IOFBF,BUFSIZE);
+    setvbuf(fout,NULL,_IOFBF,BUFSIZE);
     gettimeofday(&before, NULL);
     do {
         if (!eof1) {
@@ -68,20 +70,38 @@ leave0:
 /* return 1 if fin meets end of file */
 int
 readaline_and_out(FILE *fin, FILE *fout)
-{    
-    int ch, count = 0;
-
+{  
+    int ch, count=0; 
+    char str[1024], *p_str;
+    p_str = str;
     do {
-        if ((ch = fgetc(fin)) == EOF) {
-            if (!count)
-                return 1;
-            else {
-                fputc(0x0a, fout);
-                break;
-            }
+      	if ((ch = fgetc(fin)) == EOF) {
+        	if (!count)
+                	return 1;
+            	else {
+                	fputc(0x0a, fout);
+               		break;
+           	}
         }
-        fputc(ch, fout);
+	*p_str++ = ch;
         count++;
     } while (ch != 0x0a);
+    /* reverse string */
+    *p_str = 0;
+    char *start = str;
+    char *end = start + strlen(str) - 1; // CR + LF
+    char tmp;
+    while(end>start)
+    	{
+		/* swap */
+		tmp = *start;
+		*start = *end;
+		*end = tmp;
+		/* move */
+		++start;
+		--end;
+	}
+    
+    fputs(str,fout);  	
     return 0;
 }

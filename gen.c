@@ -6,7 +6,7 @@
 #include <assert.h>
 
 #define MAX_NUM_FILE  9999
-#define MAX_FILE_SIZE (32 * 1024)   // in MB
+#define MAX_FILE_SIZE (100 * 1024)   // in MB
 
 int
 main(int argc, char *argv[])
@@ -48,7 +48,7 @@ usage2: fprintf(stderr, "File size should be >= 0, <= %d\n", MAX_FILE_SIZE);
     srandom(seed.tv_usec);
 
     while (num_file) {
-        sprintf(fname, "/tmp/file_%04d", num_file);
+        sprintf(fname, "file_%d", num_file);
         if ((fout = fopen(fname, "wt")) == NULL) {
             perror(fname);
             return 1;
